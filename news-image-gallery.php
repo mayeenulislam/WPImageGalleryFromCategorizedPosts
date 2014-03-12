@@ -21,30 +21,27 @@ Template name: News Image Gallery
 			global $wpdb;
 			$wpdb->show_errors();
 			$tablePosts = $wpdb->prefix . "posts";
+			$tableTaxonomyRel = $wpdb->prefix . "term_relationships";
 
-			// Query for all the attachments
+			/** Query for all the attachments
+			*	The query will look for all the attachments,
+			*		get only images (jpg,png,gif,tiff)
+			*		which are included into posts (and categorized)
+			*		exclude images of Post category "Uncategorized" (id = 1)
+			*/
+
+			$catArray = "2,3,4,5,6,7";
+
 			$gal_query = $wpdb->get_results(
-		        "SELECT ID, post_type, post_parent, guid, post_date, post_mime_type
-		            FROM $tablePosts
-		            WHERE post_type = 'attachment'
-		            	AND post_mime_type = 'image/jpeg'		/* jpg|jpeg|jpe */
-		            		OR post_mime_type = 'image/png'		/* png */
-		            		OR post_mime_type = 'image/gif'		/* gif */
-		            		OR post_mime_type = 'image/tiff'	/* tif|tiff */
+		        "SELECT $tablePosts.ID, $tablePosts.post_type, $tablePosts.post_parent, $tablePosts.guid, $tablePosts.post_date, $tablePosts.post_mime_type, $tableTaxonomyRel.object_id, $tableTaxonomyRel.term_taxonomy_id
+		            FROM $tablePosts, $tableTaxonomyRel
+		            WHERE $tablePosts.post_type = 'attachment' AND $tablePosts.post_parent = $tableTaxonomyRel.object_id
+		            	AND ( post_mime_type = 'image/jpeg' OR post_mime_type = 'image/png' OR post_mime_type = 'image/gif' OR post_mime_type = 'image/tiff' )
+		            	AND ($tableTaxonomyRel.term_taxonomy_id != '1')
+		            	AND $tableTaxonomyRel.term_taxonomy_id IN ( $catArray )
 		            GROUP BY post_date DESC
 		            ");
-
-			//Grabbing all the Categories of the site, except "Uncategorized"
-			$catargs = array(
-				'hide_empty' => 1,
-				'exclude' => '1',
-				);
-			$siteCats = get_categories( $catargs );
-
-			$siteCatArray = array();
-			foreach( $siteCats as $siteCat ){
-				$siteCatArray[] = $siteCat->term_id;
-			} ?>
+		    ?>
 
 			<h2 class="gallery-secondary-title">ছবিতে আজকের দিন</h2>
 
@@ -66,25 +63,25 @@ Template name: News Image Gallery
 					$attachmentID = $gallery->ID; // Image/Attachment ID
 					$imageURL = $gallery->guid; // Original Image URL
 
-					if( in_category( $siteCatArray, $postID ) ) {
-							$thumbURL = wp_get_attachment_medium_url( $attachmentID );
-							$imageCaption = get_post( $attachmentID )->post_excerpt; //caption
-							$postTitle = get_the_title( $postID ); //news title
-						?>
-						<?php if( $strGotDate >= $strDateToday ) { ?>
-						<li>
-							<a href="<?php echo get_permalink( $postID ); ?>" title="<?php echo $postTitle; ?>">
-								<img src="<?php echo $imageURL ?>" alt="<?php echo $postTitle; ?>" title="<?php echo $imageCaption ? $imageCaption : $postTitle; ?>"/>
-							</a>
-						</li>
-						<?php } else { ?>
-						<li>
-							<a href="<?php echo get_permalink( $postID ); ?>" title="<?php echo $postTitle; ?>">
-								<img src="<?php echo $imageURL ?>" alt="<?php echo $postTitle; ?>" title="<?php echo $imageCaption ? $imageCaption : $postTitle; ?>"/>
-							</a>
-						</li>
-						<?php } //endif( $strGotDate >= $strDateToday ) ?>
-					<?php } //endif ?>
+					$thumbURL = wp_get_attachment_medium_url( $attachmentID );
+					$imageCaption = get_post( $attachmentID )->post_excerpt; //caption
+					$postTitle = get_the_title( $postID ); //news title
+					?>
+
+					<?php if( $strGotDate >= $strDateToday ) { ?>
+					<li>
+						<a href="<?php echo get_permalink( $postID ); ?>" title="<?php echo $postTitle; ?>">
+							<img src="<?php echo $imageURL ?>" alt="<?php echo $postTitle; ?>" title="<?php echo $imageCaption ? $imageCaption : $postTitle; ?>"/>
+						</a>
+					</li>
+					<?php } else { ?>
+					<li>
+						<a href="<?php echo get_permalink( $postID ); ?>" title="<?php echo $postTitle; ?>">
+							<img src="<?php echo $imageURL ?>" alt="<?php echo $postTitle; ?>" title="<?php echo $imageCaption ? $imageCaption : $postTitle; ?>"/>
+						</a>
+					</li>
+					<?php } //endif( $strGotDate >= $strDateToday ) ?>
+
 				<?php } //endforeach ?>
 				</ul>
 				<!-- end Basic jQuery Slider -->
@@ -110,9 +107,11 @@ Template name: News Image Gallery
 			<h2 class="gallery-secondary-title">ছবিতে সংবাদ</h2>
 
 			<?php
+			$divPlacer = 1;
 			foreach ($gal_query as $gallery) {
 
-				//var_dump($gallery);
+				$one = ( $divPlacer % 3 == 1 ? ' gal-col-one' : '' );
+		        $first = ( $divPlacer % 3 == 0  ? ' gal-col-third' : '' );
 
 				//Getting the posts' individual category
 				$postID = $gallery->post_parent;
@@ -121,26 +120,23 @@ Template name: News Image Gallery
 				$attachmentID = $gallery->ID; // Image/Attachment ID
 				$imageURL = $gallery->guid; // Original Image URL
 
-				if( in_category( $siteCatArray, $postID ) ) {
-					$thumbURL = wp_get_attachment_thumb_url( $attachmentID ); //thumbnail of the original image
-					$imageCaption = get_post( $attachmentID )->post_excerpt; //caption
-					$postTitle = get_the_title( $postID ); //news title
+				$thumbURL = wp_get_attachment_thumb_url( $attachmentID ); //thumbnail of the original image
+				$imageCaption = get_post( $attachmentID )->post_excerpt; //caption
+				$postTitle = get_the_title( $postID ); //news title
 					?>
-					<div class="gallery-thumb">
-						<a href="<?php echo $imageURL; ?>" title="<?php echo $postTitle; ?>">
-							<?php echo '<img src="'. $thumbURL .'" alt="'. $postTitle .'"/>'; ?>
-						</a>
-						<div class="gallery-image-caption">
-							<?php echo $imageCaption ? $imageCaption : $postTitle; ?>
-						</div> <!-- .gallery-image-caption -->
-						<a class="gallery-grid-footer" href="<?php echo get_permalink( $postID ); ?>" title="পড়ুন: <?php echo $postTitle; ?>">
-		                    <?php _e('মূল সংবাদ পড়ুন', 'vpata'); ?>
-		                </a> <!-- .gallery-grid-footer -->
-					</div> <!-- .gallery-thumb -->
-					<?php
-
-				} //endif
-
+				<div class="gallery-thumb <?php echo $one; echo $first; ?>">
+					<a href="<?php echo $imageURL; ?>" title="<?php echo $postTitle; ?>">
+						<?php echo '<img src="'. $thumbURL .'" alt="'. $postTitle .'"/>'; ?>
+					</a>
+					<div class="gallery-image-caption">
+						<?php echo $imageCaption ? $imageCaption : $postTitle; ?>
+					</div> <!-- .gallery-image-caption -->
+					<a class="gallery-grid-footer" href="<?php echo get_permalink( $postID ); ?>" title="পড়ুন: <?php echo $postTitle; ?>">
+	                    <?php _e('মূল সংবাদ পড়ুন', 'vpata'); ?>
+	                </a> <!-- .gallery-grid-footer -->
+				</div> <!-- .gallery-thumb -->
+				<?php
+			$divPlacer++;
 			} //endforeach
 
 			?>
