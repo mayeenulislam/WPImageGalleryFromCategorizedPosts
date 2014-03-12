@@ -14,7 +14,7 @@ Template name: News Image Gallery
             <?php
             date_default_timezone_set('Asia/Dhaka'); //globalizing the timezone first
             $dateToday = date("Y-m-d H:i:s");
-            $strDateToday = strtotime($dateToday);
+            $strDateToday = strtotime( $dateToday );
             ?>
 
 			<?php
@@ -23,25 +23,56 @@ Template name: News Image Gallery
 			$tablePosts = $wpdb->prefix . "posts";
 			$tableTaxonomyRel = $wpdb->prefix . "term_relationships";
 
+			/**
+			*	PAGINATION IN ACTION
+			*	Source: http://tareq.wedevs.com/2011/07/simple-pagination-system-in-your-wordpress-plugins/
+			*/
+
+			$pagenum = isset( $_GET['pagenum'] ) ? absint( $_GET['pagenum'] ) : 1;
+
+			$limit = 30;
+			$offset = ( $pagenum - 1 ) * $limit;
+
 			/** Query for all the attachments
-			*	The query will look for all the attachments,
 			*		get only images (jpg,png,gif,tiff)
 			*		which are included into posts (and categorized)
 			*		exclude images of Post category "Uncategorized" (id = 1)
+			*		check whether matches with our defined categories
 			*/
 
-			$catArray = "2,3,4,5,6,7";
+			$definedCats = "2,3,4,5,6,7";
 
 			$gal_query = $wpdb->get_results(
-		        "SELECT $tablePosts.ID, $tablePosts.post_type, $tablePosts.post_parent, $tablePosts.guid, $tablePosts.post_date, $tablePosts.post_mime_type, $tableTaxonomyRel.object_id, $tableTaxonomyRel.term_taxonomy_id
-		            FROM $tablePosts, $tableTaxonomyRel
-		            WHERE $tablePosts.post_type = 'attachment' AND $tablePosts.post_parent = $tableTaxonomyRel.object_id
-		            	AND ( post_mime_type = 'image/jpeg' OR post_mime_type = 'image/png' OR post_mime_type = 'image/gif' OR post_mime_type = 'image/tiff' )
-		            	AND ($tableTaxonomyRel.term_taxonomy_id != '1')
-		            	AND $tableTaxonomyRel.term_taxonomy_id IN ( $catArray )
-		            GROUP BY post_date DESC
-		            ");
+		        "SELECT
+		        	$tablePosts.ID,
+		        	$tablePosts.post_type,
+		        	$tablePosts.post_parent,
+		        	$tablePosts.guid,
+		        	$tablePosts.post_date,
+		        	$tablePosts.post_mime_type,
+		        	$tableTaxonomyRel.object_id,
+		        	$tableTaxonomyRel.term_taxonomy_id
+			    FROM $tablePosts, $tableTaxonomyRel
+			    WHERE $tablePosts.post_type = 'attachment' AND $tablePosts.post_parent = $tableTaxonomyRel.object_id
+			       	AND (
+			       		post_mime_type = 'image/jpeg'
+			       		OR post_mime_type = 'image/png'
+			       		OR post_mime_type = 'image/gif'
+			       		OR post_mime_type = 'image/tiff'
+			       		)
+		    	   	AND ($tableTaxonomyRel.term_taxonomy_id != '1')
+		          	AND $tableTaxonomyRel.term_taxonomy_id IN ( $definedCats )
+		        GROUP BY post_date DESC
+		        LIMIT $offset, $limit
+		        ");
 		    ?>
+
+		    <?php
+		    /**
+		    *	SHOW the today's Gallery
+		    *	only on the first page
+		    */
+		    if( $pagenum == 1 ) { ?>
 
 			<h2 class="gallery-secondary-title">ছবিতে আজকের দিন</h2>
 
@@ -104,7 +135,9 @@ Template name: News Image Gallery
 			});
 			</script>
 
-			<h2 class="gallery-secondary-title">ছবিতে সংবাদ</h2>
+			<?php } //endif( $pagenum == 1 ) ?>
+
+			<h2 class="gallery-secondary-title">ছবিতে সকল সংবাদ</h2>
 
 			<?php
 			$divPlacer = 1;
@@ -140,6 +173,47 @@ Template name: News Image Gallery
 			} //endforeach
 
 			?>
+
+			<?php
+
+			$newQuery = $wpdb->get_results(
+		        "SELECT
+		        	$tablePosts.post_type,
+		        	$tablePosts.post_parent,
+		        	$tablePosts.post_date,
+		        	$tablePosts.post_mime_type,
+		        	$tableTaxonomyRel.object_id,
+		        	$tableTaxonomyRel.term_taxonomy_id
+			    FROM $tablePosts, $tableTaxonomyRel
+			    WHERE $tablePosts.post_type = 'attachment' AND $tablePosts.post_parent = $tableTaxonomyRel.object_id
+			       	AND (
+			       		post_mime_type = 'image/jpeg'
+			       		OR post_mime_type = 'image/png'
+			       		OR post_mime_type = 'image/gif'
+			       		OR post_mime_type = 'image/tiff'
+			       		)
+		    	   	AND ($tableTaxonomyRel.term_taxonomy_id != '1')
+		          	AND $tableTaxonomyRel.term_taxonomy_id IN ( $definedCats )
+		        GROUP BY post_date DESC
+		        ");
+
+			$total = count($newQuery);
+			$num_of_pages = ceil( $total / $limit );
+
+			$page_links = paginate_links( array(
+			    'base' => add_query_arg( 'pagenum', '%#%' ),
+			    'format' => '',
+			    'prev_text' => __( '&laquo;', 'aag' ),
+			    'next_text' => __( '&raquo;', 'aag' ),
+			    'total' => $num_of_pages,
+			    'current' => $pagenum
+			) );
+			 
+			if ( $page_links ) { ?>
+			    <div class="news-gallery-navigation clearfix go-right">
+			    	<div class="news-gallery-pages" style="margin: 1em 0"><?php echo $page_links; ?></div>
+			    </div>
+			<?php } ?>
 
             </div> <!-- #content -->
         </content>
